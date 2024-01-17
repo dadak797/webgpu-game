@@ -1,8 +1,11 @@
+import shaderSource from './shader/shader.wgsl?raw';
+
 
 class Renderer {
 
   private context!: GPUCanvasContext;
   private device!: GPUDevice;
+  private pipeline!: GPURenderPipeline;
 
   constructor() {
 
@@ -55,6 +58,42 @@ class Renderer {
       device: this.device,
       format: navigator.gpu.getPreferredCanvasFormat() // RGBA8Unorm is the only guaranteed renderable format
     });
+
+    this.prepareModel();
+  }
+
+  private prepareModel(): void {
+
+    const shaderModule = this.device.createShaderModule({
+      code: shaderSource
+    });
+
+
+    const vertexState: GPUVertexState = {
+      module: shaderModule,
+      entryPoint: "vertexMain", // name of the entry point function for vertex shader, must be same as in shader
+      buffers: []
+    };
+
+    const fragmentState: GPUFragmentState = {
+      module: shaderModule,
+      entryPoint: "fragmentMain", // name of the entry point function for fragment/pixel shader, must be same as in shader
+      targets: [
+        {
+          format: navigator.gpu.getPreferredCanvasFormat() 
+        }
+      ]
+    };
+
+    this.pipeline = this.device.createRenderPipeline({
+      vertex: vertexState,
+      fragment: fragmentState,
+      primitive: {
+        topology: "triangle-list" // type of primitive to render
+      },
+      layout: "auto",
+    });
+
   }
 
   public draw(): void {
@@ -100,6 +139,8 @@ class Renderer {
     const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
 
     // DRAW HERE
+    passEncoder.setPipeline(this.pipeline);
+    passEncoder.draw(3); // draw 3 vertices
 
     // endPass is used to end a render pass encoder.
     passEncoder.end();
