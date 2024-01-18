@@ -6,6 +6,8 @@ class Renderer {
   private context!: GPUCanvasContext;
   private device!: GPUDevice;
   private pipeline!: GPURenderPipeline;
+  private positionBuffer!: GPUBuffer;
+  private colorsBuffer!: GPUBuffer;
 
   constructor() {
 
@@ -60,6 +62,38 @@ class Renderer {
     });
 
     this.prepareModel();
+
+    this.positionBuffer = this.createBuffer(new Float32Array([
+      -0.5, -0.5, // x, y
+       0.5, -0.5,
+      -0.5,  0.5,
+      -0.5,  0.5,
+       0.5,  0.5,
+       0.5, -0.5
+    ]));
+
+    this.colorsBuffer = this.createBuffer(new Float32Array([
+      1.0, 0.0, 1.0,  // r g b 
+      0.0, 1.0, 1.0,
+      0.0, 1.0, 1.0,
+      1.0, 0.0, 0.0,  // r g b 
+      0.0, 1.0, 0.0,
+      0.0, 0.0, 1.0,
+    ]));
+  }
+
+  private createBuffer(data: Float32Array): GPUBuffer {
+
+    const buffer = this.device.createBuffer({
+      size: data.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true
+    });
+
+    new Float32Array(buffer.getMappedRange()).set(data);
+    buffer.unmap();
+
+    return buffer;
   }
 
   private prepareModel(): void {
@@ -68,11 +102,38 @@ class Renderer {
       code: shaderSource
     });
 
+    const positionBufferLayout: GPUVertexBufferLayout =
+    {
+      arrayStride: 2 * Float32Array.BYTES_PER_ELEMENT, // 2 floats * 4 bytes per float
+      attributes: [
+        {
+          shaderLocation: 0,
+          offset: 0,
+          format: "float32x2" // 2 floats
+        }
+      ],
+      stepMode: "vertex"
+    };
+
+    const colorBufferLayout: GPUVertexBufferLayout = {
+      arrayStride: 3 * Float32Array.BYTES_PER_ELEMENT, // rgb * 4 bytes per float
+      attributes: [
+        {
+          shaderLocation: 1,
+          offset: 0,
+          format: "float32x3" // 3 floats
+        }
+      ],
+      stepMode: "vertex"
+    };
 
     const vertexState: GPUVertexState = {
       module: shaderModule,
       entryPoint: "vertexMain", // name of the entry point function for vertex shader, must be same as in shader
-      buffers: []
+      buffers: [
+        positionBufferLayout,
+        colorBufferLayout,
+      ]
     };
 
     const fragmentState: GPUFragmentState = {
@@ -140,7 +201,9 @@ class Renderer {
 
     // DRAW HERE
     passEncoder.setPipeline(this.pipeline);
-    passEncoder.draw(3); // draw 3 vertices
+    passEncoder.setVertexBuffer(0, this.positionBuffer);
+    passEncoder.setVertexBuffer(1, this.colorsBuffer);
+    passEncoder.draw(6); // draw 3 vertices
 
     // endPass is used to end a render pass encoder.
     passEncoder.end();
